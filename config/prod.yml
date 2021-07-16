@@ -1,0 +1,52 @@
+app:
+  name: "monica-adaptor"
+  port: 7001
+
+log:
+  level: "info"
+  filename: "logs/monica-adaptor.log"
+  max_size: 200
+  max_age: 30
+  max_backups: 7
+
+mysql:
+  host:
+  port:
+  user:
+  password:
+  dbname: "monica-adaptor"
+  max_open_conns: 200
+  max_idel_conns: 50
+
+redis:
+  host: "127.0.0.1"
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 100
+
+metric_filter:
+  metricNameRegex: ".*"
+  labelNameRegex: ".*"
+  labelValueRegex: ".*"
+
+metric_store:
+  cache:
+    isexpire: true
+    expire: 604800
+    dist_interval: 172800
+  store:
+    url:
+      - "http://127.0.0.1:9200"
+    username:
+    password:
+    bulk_rate: 5
+    index_name: "metric"
+
+remote:
+  write:
+    url: "http://127.0.0.1:8428/api/v1/write"
+    content_type: "application/x-protobuf"
+  send:
+    url: "http://127.0.0.1:8428/api/put"
+    content_type: "application/json"
