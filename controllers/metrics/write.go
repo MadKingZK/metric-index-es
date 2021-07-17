@@ -2,9 +2,13 @@ package metrics
 
 import (
 	"io/ioutil"
+	"math"
+	"monica-adaptor/library"
+	"monica-adaptor/library/cgroup"
 	"monica-adaptor/services/metrics"
 	"monica-adaptor/services/remote/victoriametrics"
 	"net/http"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -13,6 +17,40 @@ import (
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
 )
+
+var JobChannel = make(chan []string, math.MaxUint16)
+var numCpu int
+
+func init() {
+	numCpu = cgroup.AvailableCPUs()
+	for i := 0; i < numCpu; i++ {
+		go workChannel()
+	}
+}
+
+func workChannel() {
+	defer func() {
+		if r := recover(); r != nil {
+			zap.L().Fatal("work channel fun panic")
+		}
+	}()
+	m := make([]string, 0, math.MaxUint16/numCpu+1)
+	timer := library.Get(time.Millisecond * 100)
+	for {
+		select {
+		case value, ok := <-JobChannel:
+			if !ok {
+				library.Put(timer)
+				return
+			}
+			m = append(m, value...)
+		case <-timer.C:
+			metrics.MetricStore(m)
+			m = m[:0]
+			library.Put(timer)
+		}
+	}
+}
 
 // Write 接收remote write
 func Write(c *gin.Context) {
@@ -46,6 +84,7 @@ func Write(c *gin.Context) {
 	}
 
 	metricSlice := metrics.AsmMetric(wq)
+	JobChannel <- metricSlice
 	//metricSlice := metrics.WQMetricFilterAndAsm(wq)
 	//if len(wq.Timeseries) == 0 {
 	//	c.JSON(http.StatusOK, gin.H{
@@ -55,8 +94,6 @@ func Write(c *gin.Context) {
 	//	})
 	//	return
 	//}
-
-	go metrics.MetricStore(metricSlice)
 
 	// 发送metrics到victoriaMetrics，不能异步发送
 	// Prometheus对remote wirte有错误处理，失败时会retry重试，阻塞等待
