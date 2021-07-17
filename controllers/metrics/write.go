@@ -45,8 +45,10 @@ func workChannel() {
 			}
 			m = append(m, value...)
 		case <-timer.C:
-			metrics.MetricStore(m)
+			temp := make([]string, 0, len(m))
+			copy(temp, m)
 			m = m[:0]
+			metrics.MetricStore(temp)
 			library.Put(timer)
 		}
 	}
