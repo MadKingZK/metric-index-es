@@ -28,6 +28,10 @@ func init() {
 	}
 }
 
+const (
+	timerOut = time.Millisecond * 100
+)
+
 func workChannel() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -35,21 +39,27 @@ func workChannel() {
 		}
 	}()
 	m := make([]string, 0, math.MaxUint16/numCpu+1)
-	timer := library.Get(time.Millisecond * 100)
+	timer := library.Get(timerOut)
 	for {
 		select {
 		case value, ok := <-JobChannel:
 			if !ok {
 				library.Put(timer)
+				metrics.MetricStore(m)
 				return
 			}
 			m = append(m, value...)
 		case <-timer.C:
-			temp := make([]string, 0, len(m))
+			library.Put(timer)
+			timer = library.Get(timerOut)
+			n := len(m)
+			if n <= 0 {
+				continue
+			}
+			temp := make([]string, len(m))
 			copy(temp, m)
 			m = m[:0]
 			metrics.MetricStore(temp)
-			library.Put(timer)
 		}
 	}
 }
