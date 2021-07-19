@@ -13,7 +13,7 @@ import (
 
 // Metrics 处理主动发送metric请求
 func Metrics(c *gin.Context) {
-	req := new(apimetrics.Req)
+	req := new(apimetrics.WriteReq)
 	if err := c.ShouldBindJSON(&req); err != nil {
 		zap.L().Error("bad request, req struct can not bind json", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{

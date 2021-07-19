@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"monica-adaptor/config"
-	"monica-adaptor/controllers/metrics"
 	"monica-adaptor/dao/elasticsearch"
 	"monica-adaptor/dao/mysql"
 	"monica-adaptor/dao/redis"
@@ -88,8 +87,8 @@ func main() {
 	// 创建一个5秒超时的context
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	defer elasticsearch.CloseBulkIndexer()
 	// 5秒内优雅关闭服务（将未处理完的请求处理完再关闭服务），超过5秒就超时退出
-	close(metrics.JobChannel)
 	if err := srv.Shutdown(ctx); err != nil {
 		zap.L().Fatal("Server Shutdown: ", zap.Error(err))
 	}

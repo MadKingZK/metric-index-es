@@ -1,16 +1,20 @@
 package redis
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"monica-adaptor/config"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/go-redis/redis"
 )
 
 // 声明一个全局的rdb变量
 var rdb *redis.Client
+var ci Committer
 
 // Init 初始化redis
 func Init(cfg *config.RedisConfig) (err error) {
@@ -24,13 +28,48 @@ func Init(cfg *config.RedisConfig) (err error) {
 		PoolSize: cfg.PoolSize,
 	})
 
-	_, err = rdb.Ping().Result()
+	if _, err = rdb.Ping().Result(); err != nil {
+		return
+	}
+
+	err = InitCommitter()
+	return
+}
+
+// InitCommitter 初始化redis committer
+func InitCommitter() (err error) {
+	cfg := CommitterConfig{
+		NumWorkers:    config.Conf.MetricStore.Cache.WorkerNum,
+		FlushLens:     config.Conf.MetricStore.Cache.FlushLens,
+		FlushInterval: config.Conf.MetricStore.Cache.FlushInterval * time.Second,
+		Client:        rdb,
+		DebugLogger:   nil,
+	}
+	cfg.ActionSet()
+	ci, err = NewCommitter(cfg)
+	if err != nil {
+		zap.L().Error("Error creating the indexer: %s", zap.Error(err))
+	}
 	return
 }
 
 // Close 关闭redis连接
 func Close() {
 	_ = rdb.Close()
+}
+
+// CloseCommitter 关闭committer，在main中defer调用
+func CloseCommitter() (err error) {
+	if err = ci.Close(context.Background()); err != nil {
+		zap.L().Error("Close Committer Failed", zap.Error(err))
+	}
+	return
+}
+
+// Push 推送redis cmd
+func Push(commitItem CommitItem) (err error) {
+	err = ci.Add(context.Background(), commitItem)
+	return
 }
 
 // ExistOne 判断一个key是否在redis中存在
@@ -65,6 +104,31 @@ func PipeExistsByGet(keys []string) ([]bool, error) {
 		}
 		_, err := cmd.Int()
 		result[i] = err == nil
+	}
+	defer pipe.Close()
+	return result, nil
+}
+
+// PipeSetNX 通过get判断简单kv类型的key是否存在
+func PipeSetNX(keys []string, v interface{}, exTime time.Duration) ([]bool, error) {
+	if len(keys) <= 0 {
+		return nil, nil
+	}
+	pipe := rdb.Pipeline()
+	for i := range keys {
+		pipe.SetNX(keys[i], v, exTime)
+	}
+
+	result := make([]bool, len(keys))
+	cmders, _ := pipe.Exec()
+
+	for i := range cmders {
+		cmd, ok := cmders[i].(*redis.BoolCmd)
+		if !ok {
+			return nil, errors.New("interface conversion: cat not convert redis.StringCmd")
+		}
+		res, _ := cmd.Result()
+		result[i] = res
 	}
 	defer pipe.Close()
 	return result, nil

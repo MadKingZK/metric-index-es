@@ -55,4 +55,4 @@ class MyBlogs(FastHttpUser):
 if __name__ == "__main__":
     import os
 
-    os.system("locust-tools -f locusttest.py --host=http://10.0.33.178")
+    os.system("locust-tools -f locusttest.py --host=http://127.0.0.1")

@@ -2,13 +2,10 @@ package metrics
 
 import (
 	"io/ioutil"
-	"math"
-	"monica-adaptor/library"
-	"monica-adaptor/library/cgroup"
+	apimetrics "monica-adaptor/api/metrics"
+	"monica-adaptor/dao/elasticsearch"
 	"monica-adaptor/services/metrics"
-	"monica-adaptor/services/remote/victoriametrics"
 	"net/http"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -17,42 +14,6 @@ import (
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
 )
-
-var JobChannel = make(chan []string, math.MaxUint16)
-var numCpu int
-
-func init() {
-	numCpu = cgroup.AvailableCPUs()
-	for i := 0; i < numCpu; i++ {
-		go workChannel()
-	}
-}
-
-func workChannel() {
-	defer func() {
-		if r := recover(); r != nil {
-			zap.L().Fatal("work channel fun panic")
-		}
-	}()
-	m := make([]string, 0, math.MaxUint16/numCpu+1)
-	timer := library.Get(time.Millisecond * 100)
-	for {
-		select {
-		case value, ok := <-JobChannel:
-			if !ok {
-				library.Put(timer)
-				return
-			}
-			m = append(m, value...)
-		case <-timer.C:
-			temp := make([]string, 0, len(m))
-			copy(temp, m)
-			m = m[:0]
-			metrics.MetricStore(temp)
-			library.Put(timer)
-		}
-	}
-}
 
 // Write 接收remote write
 func Write(c *gin.Context) {
@@ -86,7 +47,8 @@ func Write(c *gin.Context) {
 	}
 
 	metricSlice := metrics.AsmMetric(wq)
-	JobChannel <- metricSlice
+	metrics.MetricStore(metricSlice)
+
 	//metricSlice := metrics.WQMetricFilterAndAsm(wq)
 	//if len(wq.Timeseries) == 0 {
 	//	c.JSON(http.StatusOK, gin.H{
@@ -100,15 +62,14 @@ func Write(c *gin.Context) {
 	// 发送metrics到victoriaMetrics，不能异步发送
 	// Prometheus对remote wirte有错误处理，失败时会retry重试，阻塞等待
 	//if err = victoriametrics.ReqForward(cmpBody); err != nil {
-	if err = victoriametrics.Write(wq); err != nil {
-		zap.L().Error("send to vm failed", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    http.StatusInternalServerError,
-			"message": http.StatusText(http.StatusInternalServerError),
-			"data":    "",
-		})
-	}
-	zap.L().Info("send to vm success")
+	//if err = victoriametrics.Write(wq); err != nil {
+	//	zap.L().Error("send to vm failed", zap.Error(err))
+	//	c.JSON(http.StatusInternalServerError, gin.H{
+	//		"code":    http.StatusInternalServerError,
+	//		"message": http.StatusText(http.StatusInternalServerError),
+	//		"data":    "",
+	//	})
+	//}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    http.StatusOK,
@@ -116,4 +77,35 @@ func Write(c *gin.Context) {
 		"data":    "",
 	})
 	return
+}
+
+// Stats 获取es bulk api状态
+func Stats(c *gin.Context) {
+	stats := elasticsearch.BulkStats()
+	statsResp := apimetrics.StatsResp{
+		NumAdded:    stats.NumAdded,
+		NumFlushed:  stats.NumFlushed,
+		NumFailed:   stats.NumFailed,
+		NumIndexed:  stats.NumIndexed,
+		NumCreated:  stats.NumCreated,
+		NumUpdated:  stats.NumUpdated,
+		NumDeleted:  stats.NumDeleted,
+		NumRequests: stats.NumRequests,
+	}
+
+	//resp, err := json.Marshal(statsResp)
+	//if err != nil {
+	//	zap.L().Error("marshal statResp err", zap.Error(err))
+	//	c.JSON(http.StatusInternalServerError, gin.H{
+	//		"code":    http.StatusInternalServerError,
+	//		"message": http.StatusText(http.StatusInternalServerError),
+	//		"data":    "",
+	//	})
+	//}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    http.StatusOK,
+		"message": http.StatusText(http.StatusOK),
+		"data":    statsResp,
+	})
 }

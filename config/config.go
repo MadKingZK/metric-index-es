@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
@@ -84,18 +85,24 @@ type MetricStore struct {
 
 // Cache 缓存配置
 type Cache struct {
-	IsExpire     bool `mapstructure:"isexpire"`
-	Expire       int  `mapstructure:"expire"`
-	DistInterval int  `mapstructure:"dist_interval"`
+	IsExpire      bool          `mapstructure:"isexpire"`
+	Expire        int           `mapstructure:"expire"`
+	DistInterval  int           `mapstructure:"dist_interval"`
+	WorkerNum     int           `mapstructure:"worker_num"`
+	FlushLens     int           `mapstructure:"flush_lens"`
+	FlushInterval time.Duration `mapstructure:"flush_interval"`
 }
 
 // Store 存储配置
 type Store struct {
-	URL       []string `mapstructure:"url"`
-	UserName  string   `mapstructure:"username"`
-	Password  string   `mapstructure:"password"`
-	BulkRate  int      `mapstructure:"bulk_rate"`
-	IndexName string   `mapstructure:"index_name"`
+	URL           []string      `mapstructure:"url"`
+	UserName      string        `mapstructure:"username"`
+	Password      string        `mapstructure:"password"`
+	IndexName     string        `mapstructure:"index_name"`
+	WorkerNum     int           `mapstructure:"worker_num"`
+	FlushBytes    int           `mapstructure:"flush_bytes"`
+	FlushInterval time.Duration `mapstructure:"flush_interval"`
+	ChanSize      int           `mapstructure:"chan_size"`
 }
 
 // Remote 转发metrics到远端服务的相关配置

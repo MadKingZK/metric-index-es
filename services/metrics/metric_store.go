@@ -1,12 +1,15 @@
 package metrics
 
 import (
+	"bytes"
+	"context"
 	"math/rand"
 	"monica-adaptor/config"
-	"monica-adaptor/dao/elasticsearch"
+	es "monica-adaptor/dao/elasticsearch"
 	"monica-adaptor/dao/redis"
 	"time"
 
+	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
 )
 
@@ -14,65 +17,72 @@ import (
 // 查询redis中是否有metric中的md5，如果没有则插入
 // 需要在controller做wq处理，metric组装（调用WQMetricFilterAndAsm或者AsmMetric）
 func MetricStore(metrics []string) {
-	expire := config.Conf.MetricStore.Cache.Expire
-	distInterval := config.Conf.MetricStore.Cache.DistInterval
-	var exTime time.Duration
-
 	result, err := redis.PipeExistsByGet(metrics)
 	if err != nil {
 		zap.L().Error("check metric key is exist from redis failed", zap.Error(err))
 	}
 
-	needInsertMetrics := make([]*elasticsearch.Metric, 0, len(result))
+	di := es.BulkIndexerItem{
+		Index:           config.Conf.MetricStore.Store.IndexName,
+		Action:          "create",
+		DocumentID:      "",
+		Body:            nil,
+		RetryOnConflict: nil,
+		OnSuccess:       BulkOnSuccess,
+		OnFailure:       BulkOnFailure,
+	}
+
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	for i := range result {
 		if !result[i] {
-			needInsertMetrics = append(needInsertMetrics, &elasticsearch.Metric{Content: metrics[i]})
+			metric, err := json.Marshal(es.Metric{Content: metrics[i]})
+			if err != nil {
+				zap.L().Error("metric struct marshal failed", zap.Error(err))
+				continue
+			}
+			di.DocumentID = metrics[i]
+			di.Body = bytes.NewReader(metric)
+			if err := es.Push(di); err != nil {
+				zap.L().Error("push metric to bulkindexer failed", zap.Error(err))
+			}
 		}
 	}
 
-	if len(needInsertMetrics) == 0 {
-		return
-	}
+	return
+}
 
+// BulkOnSuccess bulk成功时回调
+func BulkOnSuccess(ctx *context.Context, item *es.BulkIndexerItem, res *es.BulkIndexerResponseItem) {
+	// 配合PipeExistsByGet打开
+	var exTime time.Duration
 	if config.Conf.MetricStore.Cache.IsExpire {
-		exTime = time.Duration(expire-distInterval+rand.Intn(distInterval)) * time.Second
+		exTime = time.Duration(config.Conf.MetricStore.Cache.Expire-
+			config.Conf.MetricStore.Cache.DistInterval+
+			rand.Intn(config.Conf.MetricStore.Cache.DistInterval)) *
+			time.Second
 	} else {
 		exTime = time.Duration(-1) * time.Second
 	}
+	if err := redis.Push(redis.CommitItem{
+		Key:    item.DocumentID,
+		Value:  1,
+		ExTime: exTime,
+	}); err != nil {
+		zap.L().Error("push metric to redis committer failed", zap.Error(err))
+	}
 
-	bulkInsertMetric(needInsertMetrics, exTime)
-	return
+	//if err := redis.Set(item.DocumentID, 1, exTime); err != nil {
+	//	zap.L().Error("set metric from redis failed", zap.Error(err))
+	//}
 }
 
-func bulkInsertMetric(metrics []*elasticsearch.Metric, exTime time.Duration) {
-	successIDs, err := elasticsearch.BulkAPI(config.Conf.MetricStore.Store.IndexName, metrics)
-	if err != nil && successIDs == nil {
-		zap.L().Error("bulkinsert metrics into elastic failed", zap.Error(err))
-		return
-	}
-
-	kvs := make(map[string]interface{}, len(successIDs))
-	for i := range successIDs {
-		kvs[successIDs[i]] = 1
-	}
-	if err = redis.PipeSet(kvs, exTime); err != nil {
-		zap.L().Error("pipeset metric into redis failed", zap.Error(err))
-	}
-	return
-}
-
-func insertMetric(metric string) {
-	var metricStruct = new(elasticsearch.Metric)
-	metricStruct.Content = metric
-	_, err := elasticsearch.InsertDoc(config.Conf.MetricStore.Store.IndexName, metricStruct)
-	if err == nil {
-		return
-	}
-
+// BulkOnFailure bulk失败时回调
+func BulkOnFailure(ctx *context.Context, item *es.BulkIndexerItem, res *es.BulkIndexerResponseItem, err error) {
 	// 插入ES失败，则删除redis记录
-	zap.L().Error("insert into elasticsearch failed", zap.Error(err))
-	if err = redis.Del(metric); err != nil {
-		zap.L().Error("delete notation from redis failed", zap.Error(err))
-	}
+	zap.L().Error("insert into elasticsearch failed", zap.Error(err), zap.Any("err", res.Error))
 
+	// 配合PipeSetNX打开
+	//if err = redis.Del(item.DocumentID); err != nil {
+	//	zap.L().Error("delete notation from redis failed", zap.Error(err))
+	//}
 }

@@ -73,7 +73,7 @@ func WQMetricFilterAndAsm(wq *prompb.WriteRequest) (Metric []string) {
 }
 
 // MetricFilter 主动发送metrics请求的过滤器
-func MetricFilter(wq *apimetrics.Req) {
+func MetricFilter(wq *apimetrics.WriteReq) {
 	var newTS []*apimetrics.TimeSeries
 	cfg := config.Conf.MetricFilter
 	var drop bool
@@ -101,7 +101,7 @@ func MetricFilter(wq *apimetrics.Req) {
 
 // MetricFilterAndAsm 过滤metrics并组装，不符合规范的，直接丢弃，不组装进Metric Slice
 // 在即需要组装metrics做缓存和存储，又需要过滤metrics判断是否规范时，MetricFilterAndAsm可以减少遍历
-func MetricFilterAndAsm(req *apimetrics.Req) (Metric []string) {
+func MetricFilterAndAsm(req *apimetrics.WriteReq) (Metric []string) {
 	var newTS []*apimetrics.TimeSeries
 	cfg := config.Conf.MetricFilter
 	var drop bool

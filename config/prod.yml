@@ -42,6 +42,8 @@ metric_store:
     password:
     bulk_rate: 5
     index_name: "metric"
+    flush_bytes: 1024
+    flush_interval: 5
 
 remote:
   write:

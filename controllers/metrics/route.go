@@ -6,5 +6,6 @@ import "github.com/gin-gonic/gin"
 func InitRoute(app *gin.Engine) {
 	group := app.Group("/api/v1/metrics")
 	group.POST("/write", Write)
+	group.GET("/write/stats", Stats)
 	group.POST("/", Metrics)
 }

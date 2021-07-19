@@ -1,7 +1,7 @@
 package metrics
 
-// Req 主动发送metric信息的接口请求
-type Req struct {
+// WriteReq 主动发送metric信息的接口请求
+type WriteReq struct {
 	Timeseries []*TimeSeries `json:"timeseries" binding:"required,dive,required"`
 }
 
