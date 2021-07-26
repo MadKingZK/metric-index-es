@@ -2,7 +2,7 @@ package victoriametrics
 
 import (
 	"bytes"
-	"monica-adaptor/config"
+	"metric-index/config"
 	"net/http"
 	"time"
 

@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"monica-adaptor/controllers/metrics"
-	"monica-adaptor/logger"
+	"metric-index/controllers/metrics"
+	"metric-index/logger"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

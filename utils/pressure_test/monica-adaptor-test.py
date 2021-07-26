@@ -4,7 +4,7 @@ import requests
 import random
 
 import snappy
-from locust import HttpUser, task, between
+from locust import task, between
 from locust.contrib.fasthttp import FastHttpUser
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from proto import remote_pb2, types_pb2
@@ -14,8 +14,6 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class MyBlogs(FastHttpUser):
-    # wait_time = between(1, 2.5)
-
     @task(1)
     def get_blog(self):
         # 定义请求头
@@ -55,4 +53,4 @@ class MyBlogs(FastHttpUser):
 if __name__ == "__main__":
     import os
 
-    os.system("locust-tools -f locusttest.py --host=http://10.0.33.178")
+    os.system("locust-tools -f locusttest.py --host=http://127.0.0.1")

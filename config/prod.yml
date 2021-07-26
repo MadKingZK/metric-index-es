@@ -1,10 +1,11 @@
 app:
-  name: "monica-adaptor"
+  name: "metric-index"
+  mode: "prod"
   port: 7001
 
 log:
-  level: "info"
-  filename: "logs/monica-adaptor.log"
+  level: "debug"
+  filename: "logs/metric-index.log"
   max_size: 200
   max_age: 30
   max_backups: 7
@@ -14,7 +15,7 @@ mysql:
   port:
   user:
   password:
-  dbname: "monica-adaptor"
+  dbname: "metric-index"
   max_open_conns: 200
   max_idel_conns: 50
 
@@ -23,10 +24,11 @@ redis:
   port: 6379
   password: ""
   db: 0
-  pool_size: 100
+  pool_size: 3000
 
 metric_filter:
   metricNameRegex: ".*"
+  metricValueRegex: ".*"
   labelNameRegex: ".*"
   labelValueRegex: ".*"
 
@@ -34,19 +36,26 @@ metric_store:
   cache:
     isexpire: true
     expire: 604800
+    defaultExpire: 604800
+    cleanupInterval: 600
     dist_interval: 172800
+    worker_num: 100
+    flush_lens: 1000
+    flush_interval: 10
   store:
     url:
-      - "http://127.0.0.1:9200"
+      - "http://elasticsearch-host:9200"
     username:
     password:
-    bulk_rate: 5
-    index_name: "metric"
+    index_name: "metric-test"
+    worker_num: 50
+    flush_bytes: 5242880
+    flush_interval: 10
 
 remote:
   write:
-    url: "http://127.0.0.1:8428/api/v1/write"
+    url: "http://vminsert-host:8480/insert/1/prometheus/api/v1/write"
     content_type: "application/x-protobuf"
   send:
-    url: "http://127.0.0.1:8428/api/put"
+    url: "http://vminsert-host:4242/insert/1/opentsdb/api/put"
     content_type: "application/json"

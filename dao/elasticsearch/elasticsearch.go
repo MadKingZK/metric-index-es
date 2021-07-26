@@ -3,104 +3,100 @@ package elasticsearch
 import (
 	"context"
 	"errors"
-	"monica-adaptor/config"
+	"fmt"
+	"io"
+	"metric-index/config"
+	"time"
 
-	jsoniter "github.com/json-iterator/go"
-	"github.com/olivere/elastic/v7"
 	"go.uber.org/zap"
+
+	"metric-index/utils/fasthttp"
+
+	"github.com/cenkalti/backoff/v4"
+	elastic "github.com/elastic/go-elasticsearch/v7"
+	jsoniter "github.com/json-iterator/go"
 )
 
-// Metric 插入ES的metric数据格式
-type Metric struct {
-	Content string `json:"content"`
-}
+var es *elastic.Client
+var bi BulkIndexer
 
-var client *elastic.Client
+type customJSONDecoder struct{}
 
-// Init 初始化Elasticsearch
-func Init() (err error) {
-	client, err = elastic.NewClient(elastic.SetURL(config.Conf.MetricStore.Store.URL...),
-		elastic.SetBasicAuth(config.Conf.MetricStore.Store.UserName, config.Conf.MetricStore.Store.Password))
-	if err != nil {
-		zap.L().Error("Elastic init err", zap.Error(err))
-		return err
-	}
-	return nil
-}
-
-// InsertDoc 插入单个doc
-func InsertDoc(indexName string, doc interface{}) (res *elastic.IndexResponse, err error) {
-	ctx := context.Background()
-	res, err = client.Index().Index(indexName).BodyJson(doc).Do(ctx)
-	return
-}
-
-//BulkAPI 批量同步到ES
-func BulkAPI(indexName string, metrics []*Metric) ([]string, error) {
-	if len(metrics) <= 0 {
-		return nil, nil
-	}
-
-	if client == nil {
-		return nil, errors.New("client is nil")
-	}
-
+func (d customJSONDecoder) UnmarshalFromReader(r io.Reader, blk *BulkIndexerResponse) error {
 	json := jsoniter.ConfigCompatibleWithStandardLibrary
-	ctx := context.Background()
-	bulkReq := client.Bulk()
-	req := elastic.NewBulkIndexRequest()
-	for i := range metrics {
-		//req := elastic.NewBulkIndexRequest().Index(indexName).Id(metrics[i].Content).Doc(metrics[i])
-		metric, err := json.Marshal(metrics[i])
-		if err != nil {
-			zap.L().Error("Marshal metric failed", zap.Error(err))
-		}
-		req.Index(indexName).Id(metrics[i].Content).Doc(string(metric))
-		if req == nil {
-			zap.L().Error("BulkAPI panic!", zap.Any("data", map[string]interface{}{"data": metrics[i]}))
-			continue
-		}
-		bulkReq = bulkReq.Add(req)
+	return json.NewDecoder(r).Decode(blk)
+}
+
+// Init 初始化esclient和bulkindexer
+func Init() (err error) {
+	retryBackoff := backoff.NewExponentialBackOff()
+	conf := elastic.Config{
+		Addresses:    config.Conf.MetricStore.Store.URL,
+		Transport:    &fasthttp.Transport{},
+		DisableRetry: false,
+		RetryBackoff: func(i int) time.Duration {
+			if i == 1 {
+				retryBackoff.Reset()
+			}
+			return retryBackoff.NextBackOff()
+		},
 	}
 
-	bulkResopne, err := bulkReq.Do(ctx)
+	if es, err = elastic.NewClient(conf); err != nil {
+		return
+	}
+
+	res, err := es.Info()
 	if err != nil {
-		zap.L().Error("ElasticBulkApi do err", zap.Error(err))
-		return nil, err
+		return
+	}
+	if res.IsError() {
+		return errors.New("connect ES failed")
+	}
+	fmt.Println("============-> Connect ES Success <-============")
+	fmt.Println(res.String())
+
+	if err := InitBulkIndexer(); err != nil {
+		fmt.Println("xxxxxxxxxxxx-> Init BulkIndexer Err <-xxxxxxxxxxxx")
 	}
 
-	// failedID := getBulkFailedIDs(bulkResopne)
-	successIDs := getBulkSuccessIDs(bulkResopne)
-	return successIDs, nil
+	fmt.Println("============-> Init BulkIndexer Success <-============")
+	return
 }
 
-func getBulkSuccessIDs(r *elastic.BulkResponse) (IDs []string) {
-	if r.Items == nil {
-		return nil
-	}
-	for i := range r.Items {
-		for _, result := range r.Items[i] {
-			if !(result.Status >= 200 && result.Status <= 299) {
-				zap.L().Error("bulk exec elastic failed")
-				continue
-			}
-			IDs = append(IDs, result.Id)
-		}
+// InitBulkIndexer 初始化 bulkindexer
+func InitBulkIndexer() (err error) {
+	bi, err = NewBulkIndexer(BulkIndexerConfig{
+		Index:         config.Conf.MetricStore.Store.IndexName,                   // The default index name
+		Client:        es,                                                        // The Elasticsearch client
+		NumWorkers:    config.Conf.MetricStore.Store.WorkerNum,                   // The number of worker goroutines
+		FlushBytes:    config.Conf.MetricStore.Store.FlushBytes,                  // The flush threshold in bytes
+		FlushInterval: config.Conf.MetricStore.Store.FlushInterval * time.Second, // The periodic flush interval
+		Decoder:       customJSONDecoder{},
+	})
+	if err != nil {
+		zap.L().Error("Error creating the indexer: %s", zap.Error(err))
 	}
 	return
 }
 
-func getBulkFailedIDs(r *elastic.BulkResponse) (IDs []string) {
-	if r.Items == nil {
-		return nil
-	}
-	for i := range r.Items {
-		for _, result := range r.Items[i] {
-			if !(result.Status >= 200 && result.Status <= 299) {
-				zap.L().Error("bulk exec elastic failed")
-				IDs = append(IDs, result.Id)
-			}
-		}
+// CloseBulkIndexer 关闭bulkindexer，在main中defer调用
+func CloseBulkIndexer() (err error) {
+	if err = bi.Close(context.Background()); err != nil {
+		zap.L().Error("Close BulkIndexer Failed", zap.Error(err))
 	}
 	return
+}
+
+// Push 推送消息
+func Push(bulkIndexerItem BulkIndexerItem) (err error) {
+	err = bi.Add(context.Background(), bulkIndexerItem)
+
+	return
+}
+
+// BulkStats 获取es bulk api状态
+func BulkStats() BulkIndexerStats {
+	stats := bi.Stats()
+	return stats
 }

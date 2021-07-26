@@ -2,8 +2,8 @@ package victoriametrics
 
 import (
 	"encoding/json"
-	apimetrics "monica-adaptor/api/metrics"
-	"monica-adaptor/config"
+	apimetrics "metric-index/api/metrics"
+	"metric-index/config"
 )
 
 // Send 发送metrics到远端服务

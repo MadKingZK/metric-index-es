@@ -1,9 +1,8 @@
 package metrics
 
 import (
-	apimetrics "monica-adaptor/api/metrics"
-	"monica-adaptor/services/metrics"
-	"monica-adaptor/services/remote/victoriametrics"
+	apimetrics "metric-index/api/metrics"
+	"metric-index/services/remote/victoriametrics"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -13,7 +12,7 @@ import (
 
 // Metrics 处理主动发送metric请求
 func Metrics(c *gin.Context) {
-	req := new(apimetrics.Req)
+	req := new(apimetrics.WriteReq)
 	if err := c.ShouldBindJSON(&req); err != nil {
 		zap.L().Error("bad request, req struct can not bind json", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -24,18 +23,18 @@ func Metrics(c *gin.Context) {
 		return
 	}
 
-	var metricSlice []string
-	metricSlice = metrics.MetricFilterAndAsm(req)
-	if len(req.Timeseries) == 0 {
-		c.JSON(http.StatusOK, gin.H{
-			"code":    http.StatusOK,
-			"message": "success",
-			"data":    "",
-		})
-		return
-	}
+	//var metricSlice []string
+	//metricSlice = metrics.MetricFilterAndAsm(req)
+	//if len(req.Timeseries) == 0 {
+	//	c.JSON(http.StatusOK, gin.H{
+	//		"code":    http.StatusOK,
+	//		"message": "success",
+	//		"data":    "",
+	//	})
+	//	return
+	//}
 
-	go metrics.MetricStore(metricSlice)
+	//metrics.MetricStore(req)
 
 	// 发送metrics到victoriaMetrics
 	if err := victoriametrics.Send(req.Timeseries); err != nil {
