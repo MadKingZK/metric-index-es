@@ -1,7 +1,7 @@
 package logger
 
 import (
-	"monica-adaptor/config"
+	"metric-index/config"
 	"net"
 	"net/http"
 	"net/http/httputil"

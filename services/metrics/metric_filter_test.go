@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"fmt"
-	"monica-adaptor/config"
+	"metric-index/config"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,7 +10,7 @@ import (
 
 func TestMetricFilter(t *testing.T) {
 	home, _ := os.UserHomeDir()
-	err := os.Chdir(filepath.Join(home, "go", "monica-adaptor"))
+	err := os.Chdir(filepath.Join(home, "go", "metric-index"))
 	if err != nil {
 		panic(err)
 	}

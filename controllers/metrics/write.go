@@ -2,9 +2,9 @@ package metrics
 
 import (
 	"io/ioutil"
-	apimetrics "monica-adaptor/api/metrics"
-	"monica-adaptor/dao/elasticsearch"
-	"monica-adaptor/services/metrics"
+	apimetrics "metric-index/api/metrics"
+	"metric-index/dao/elasticsearch"
+	"metric-index/services/metrics"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -46,8 +46,7 @@ func Write(c *gin.Context) {
 		panic(err)
 	}
 
-	metricSlice := metrics.AsmMetric(wq)
-	metrics.MetricStore(metricSlice)
+	metrics.MetricStore(wq)
 
 	//metricSlice := metrics.WQMetricFilterAndAsm(wq)
 	//if len(wq.Timeseries) == 0 {

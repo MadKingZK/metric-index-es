@@ -1,4 +1,4 @@
-module monica-adaptor
+module metric-index
 
 go 1.15
 
@@ -22,6 +22,7 @@ require (
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/smartystreets/assertions v1.1.1 // indirect
 	github.com/spf13/viper v1.8.1
+	github.com/valyala/fasthttp v1.28.0
 	go.uber.org/zap v1.17.0
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect

@@ -1,8 +1,8 @@
 package metrics
 
 import (
-	apimetrics "monica-adaptor/api/metrics"
-	"monica-adaptor/config"
+	apimetrics "metric-index/api/metrics"
+	"metric-index/config"
 	"strings"
 
 	"github.com/prometheus/prometheus/prompb"

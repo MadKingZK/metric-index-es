@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"monica-adaptor/config"
+	"metric-index/config"
 	"time"
 
 	"go.uber.org/zap"
@@ -32,7 +32,7 @@ func Init(cfg *config.RedisConfig) (err error) {
 		return
 	}
 
-	err = InitCommitter()
+	//err = InitCommitter()
 	return
 }
 

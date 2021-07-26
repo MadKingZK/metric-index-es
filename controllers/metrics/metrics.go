@@ -1,9 +1,8 @@
 package metrics
 
 import (
-	apimetrics "monica-adaptor/api/metrics"
-	"monica-adaptor/services/metrics"
-	"monica-adaptor/services/remote/victoriametrics"
+	apimetrics "metric-index/api/metrics"
+	"metric-index/services/remote/victoriametrics"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -24,18 +23,18 @@ func Metrics(c *gin.Context) {
 		return
 	}
 
-	var metricSlice []string
-	metricSlice = metrics.MetricFilterAndAsm(req)
-	if len(req.Timeseries) == 0 {
-		c.JSON(http.StatusOK, gin.H{
-			"code":    http.StatusOK,
-			"message": "success",
-			"data":    "",
-		})
-		return
-	}
+	//var metricSlice []string
+	//metricSlice = metrics.MetricFilterAndAsm(req)
+	//if len(req.Timeseries) == 0 {
+	//	c.JSON(http.StatusOK, gin.H{
+	//		"code":    http.StatusOK,
+	//		"message": "success",
+	//		"data":    "",
+	//	})
+	//	return
+	//}
 
-	go metrics.MetricStore(metricSlice)
+	//metrics.MetricStore(req)
 
 	// 发送metrics到victoriaMetrics
 	if err := victoriametrics.Send(req.Timeseries); err != nil {

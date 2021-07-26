@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"monica-adaptor/config"
+	"metric-index/config"
 	"time"
 
 	"go.uber.org/zap"
+
+	"metric-index/utils/fasthttp"
 
 	"github.com/cenkalti/backoff/v4"
 	elastic "github.com/elastic/go-elasticsearch/v7"
@@ -17,11 +19,6 @@ import (
 
 var es *elastic.Client
 var bi BulkIndexer
-
-// Metric 写入es的doc的结构体
-type Metric struct {
-	Content string `json:"content"`
-}
 
 type customJSONDecoder struct{}
 
@@ -34,9 +31,9 @@ func (d customJSONDecoder) UnmarshalFromReader(r io.Reader, blk *BulkIndexerResp
 func Init() (err error) {
 	retryBackoff := backoff.NewExponentialBackOff()
 	conf := elastic.Config{
-		Addresses:     config.Conf.MetricStore.Store.URL,
-		RetryOnStatus: []int{502, 503, 504, 429},
-		MaxRetries:    5,
+		Addresses:    config.Conf.MetricStore.Store.URL,
+		Transport:    &fasthttp.Transport{},
+		DisableRetry: false,
 		RetryBackoff: func(i int) time.Duration {
 			if i == 1 {
 				retryBackoff.Reset()

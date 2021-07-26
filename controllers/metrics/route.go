@@ -7,5 +7,7 @@ func InitRoute(app *gin.Engine) {
 	group := app.Group("/api/v1/metrics")
 	group.POST("/write", Write)
 	group.GET("/write/stats", Stats)
-	group.POST("/", Metrics)
+
+	// 废弃接口
+	//group.POST("/", Metrics)
 }

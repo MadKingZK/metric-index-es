@@ -49,9 +49,9 @@ type BulkIndexerConfig struct {
 	Decoder     BulkResponseJSONDecoder // A custom JSON decoder.
 	DebugLogger BulkIndexerDebugLogger  // An optional logger for debugging.
 
-	OnError      func(*context.Context, error)           // Called for indexer errors.
-	OnFlushStart func(*context.Context) *context.Context // Called when the flush starts.
-	OnFlushEnd   func(*context.Context)                  // Called when the flush ends.
+	OnError      func(context.Context, error)          // Called for indexer errors.
+	OnFlushStart func(context.Context) context.Context // Called when the flush starts.
+	OnFlushEnd   func(context.Context)                 // Called when the flush ends.
 
 	// Parameters of the Bulk API.
 	Index               string
@@ -92,8 +92,8 @@ type BulkIndexerItem struct {
 	Body            io.Reader
 	RetryOnConflict *int
 
-	OnSuccess func(*context.Context, *BulkIndexerItem, *BulkIndexerResponseItem)        // Per item
-	OnFailure func(*context.Context, *BulkIndexerItem, *BulkIndexerResponseItem, error) // Per item
+	OnSuccess func(context.Context, BulkIndexerItem, BulkIndexerResponseItem)        // Per item
+	OnFailure func(context.Context, BulkIndexerItem, BulkIndexerResponseItem, error) // Per item
 }
 
 // BulkIndexerResponse represents the Elasticsearch response.
@@ -209,7 +209,7 @@ func (bi *bulkIndexer) Add(ctx context.Context, item BulkIndexerItem) error {
 	select {
 	case <-ctx.Done():
 		if bi.config.OnError != nil {
-			go bi.config.OnError(&ctx, ctx.Err())
+			bi.config.OnError(ctx, ctx.Err())
 		}
 		return ctx.Err()
 	case bi.queue <- item:
@@ -229,7 +229,7 @@ func (bi *bulkIndexer) Close(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		if bi.config.OnError != nil {
-			go bi.config.OnError(&ctx, ctx.Err())
+			bi.config.OnError(ctx, ctx.Err())
 		}
 		return ctx.Err()
 	default:
@@ -239,10 +239,10 @@ func (bi *bulkIndexer) Close(ctx context.Context) error {
 	for _, w := range bi.workers {
 		w.mu.Lock()
 		if w.buf.Len() > 0 {
-			if err := w.flush(&ctx); err != nil {
+			if err := w.flush(ctx); err != nil {
 				w.mu.Unlock()
 				if bi.config.OnError != nil {
-					go bi.config.OnError(&ctx, err)
+					bi.config.OnError(ctx, err)
 				}
 				continue
 			}
@@ -298,10 +298,10 @@ func (bi *bulkIndexer) init() {
 				for _, w := range bi.workers {
 					w.mu.Lock()
 					if w.buf.Len() > 0 {
-						if err := w.flush(&ctx); err != nil {
+						if err := w.flush(ctx); err != nil {
 							w.mu.Unlock()
 							if bi.config.OnError != nil {
-								go bi.config.OnError(&ctx, err)
+								bi.config.OnError(ctx, err)
 							}
 							continue
 						}
@@ -345,7 +345,7 @@ func (w *worker) run() {
 
 			if err := w.writeMeta(item); err != nil {
 				if item.OnFailure != nil {
-					go item.OnFailure(&ctx, &item, &BulkIndexerResponseItem{}, err)
+					item.OnFailure(ctx, item, BulkIndexerResponseItem{}, err)
 				}
 				atomic.AddUint64(&w.bi.stats.numFailed, 1)
 				w.mu.Unlock()
@@ -354,7 +354,7 @@ func (w *worker) run() {
 
 			if err := w.writeBody(&item); err != nil {
 				if item.OnFailure != nil {
-					go item.OnFailure(&ctx, &item, &BulkIndexerResponseItem{}, err)
+					item.OnFailure(ctx, item, BulkIndexerResponseItem{}, err)
 				}
 				atomic.AddUint64(&w.bi.stats.numFailed, 1)
 				w.mu.Unlock()
@@ -363,10 +363,10 @@ func (w *worker) run() {
 
 			w.items = append(w.items, item)
 			if w.buf.Len() >= w.bi.config.FlushBytes {
-				if err := w.flush(&ctx); err != nil {
+				if err := w.flush(ctx); err != nil {
 					w.mu.Unlock()
 					if w.bi.config.OnError != nil {
-						go w.bi.config.OnError(&ctx, err)
+						w.bi.config.OnError(ctx, err)
 					}
 					continue
 				}
@@ -425,8 +425,7 @@ func (w *worker) writeBody(item *BulkIndexerItem) error {
 
 		if _, err := w.buf.ReadFrom(item.Body); err != nil {
 			if w.bi.config.OnError != nil {
-				ctx := context.Background()
-				w.bi.config.OnError(&ctx, err)
+				w.bi.config.OnError(context.Background(), err)
 			}
 			return err
 		}
@@ -441,7 +440,7 @@ func (w *worker) writeBody(item *BulkIndexerItem) error {
 
 // flush writes out the worker buffer; it must be called under a lock.
 //
-func (w *worker) flush(ctx *context.Context) error {
+func (w *worker) flush(ctx context.Context) error {
 	if w.bi.config.OnFlushStart != nil {
 		ctx = w.bi.config.OnFlushStart(ctx)
 	}
@@ -498,11 +497,11 @@ func (w *worker) flush(ctx *context.Context) error {
 	}
 	req.Header.Set(estransport.HeaderClientMeta, "h=bp")
 
-	res, err := req.Do(*ctx, w.bi.config.Client)
+	res, err := req.Do(ctx, w.bi.config.Client)
 	if err != nil {
 		atomic.AddUint64(&w.bi.stats.numFailed, uint64(len(w.items)))
 		if w.bi.config.OnError != nil {
-			go w.bi.config.OnError(ctx, fmt.Errorf("flush: %s", err))
+			w.bi.config.OnError(ctx, fmt.Errorf("flush: %s", err))
 		}
 		return fmt.Errorf("flush: %s", err)
 	}
@@ -513,7 +512,7 @@ func (w *worker) flush(ctx *context.Context) error {
 		atomic.AddUint64(&w.bi.stats.numFailed, uint64(len(w.items)))
 		// TODO(karmi): Wrap error (include response struct)
 		if w.bi.config.OnError != nil {
-			go w.bi.config.OnError(ctx, fmt.Errorf("flush: %s", err))
+			w.bi.config.OnError(ctx, fmt.Errorf("flush: %s", err))
 		}
 		return fmt.Errorf("flush: %s", res.String())
 	}
@@ -521,7 +520,7 @@ func (w *worker) flush(ctx *context.Context) error {
 	if err := w.bi.config.Decoder.UnmarshalFromReader(res.Body, &blk); err != nil {
 		// TODO(karmi): Wrap error (include response struct)
 		if w.bi.config.OnError != nil {
-			go w.bi.config.OnError(ctx, fmt.Errorf("flush: %s", err))
+			w.bi.config.OnError(ctx, fmt.Errorf("flush: %s", err))
 		}
 		return fmt.Errorf("flush: error parsing response body: %s", err)
 	}
@@ -544,7 +543,7 @@ func (w *worker) flush(ctx *context.Context) error {
 		if info.Error.Type != "" || info.Status > 201 {
 			atomic.AddUint64(&w.bi.stats.numFailed, 1)
 			if item.OnFailure != nil {
-				go item.OnFailure(ctx, &item, &info, nil)
+				item.OnFailure(ctx, item, info, nil)
 			}
 		} else {
 			atomic.AddUint64(&w.bi.stats.numFlushed, 1)
@@ -561,7 +560,7 @@ func (w *worker) flush(ctx *context.Context) error {
 			}
 
 			if item.OnSuccess != nil {
-				go item.OnSuccess(ctx, &item, &info)
+				item.OnSuccess(ctx, item, info)
 			}
 		}
 	}

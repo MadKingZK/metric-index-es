@@ -2,7 +2,7 @@ package mysql
 
 import (
 	"fmt"
-	"monica-adaptor/config"
+	"metric-index/config"
 
 	// mysql driver
 	_ "github.com/go-sql-driver/mysql"
