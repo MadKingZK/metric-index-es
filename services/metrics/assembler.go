@@ -6,8 +6,8 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 )
 
-// AsmMetric 组装metric
-func AsmMetric(wq *prompb.WriteRequest) []Metric {
+// Assembler 组装metric
+func Assembler(wq *prompb.WriteRequest) []Metric {
 	if len(wq.Timeseries) == 0 {
 		return nil
 	}

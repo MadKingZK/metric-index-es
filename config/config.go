@@ -85,12 +85,14 @@ type MetricStore struct {
 
 // Cache 缓存配置
 type Cache struct {
-	IsExpire      bool          `mapstructure:"isexpire"`
-	Expire        int           `mapstructure:"expire"`
-	DistInterval  int           `mapstructure:"dist_interval"`
-	WorkerNum     int           `mapstructure:"worker_num"`
-	FlushLens     int           `mapstructure:"flush_lens"`
-	FlushInterval time.Duration `mapstructure:"flush_interval"`
+	IsExpire        bool          `mapstructure:"isexpire"`
+	Expire          int           `mapstructure:"expire"`
+	DistInterval    int           `mapstructure:"dist_interval"`
+	DefaultExpire   time.Duration `mapstructure:"default_expire"`
+	CleanupInterval time.Duration `mapstructure:"cleanup_interval"`
+	WorkerNum       int           `mapstructure:"worker_num"`
+	FlushLens       int           `mapstructure:"flush_lens"`
+	FlushInterval   time.Duration `mapstructure:"flush_interval"`
 }
 
 // Store 存储配置

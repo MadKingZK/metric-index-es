@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	apimetrics "metric-index/api/metrics"
 	"metric-index/dao/elasticsearch"
+	"metric-index/dao/gocache"
 	"metric-index/services/metrics"
 	"net/http"
 
@@ -46,7 +47,7 @@ func Write(c *gin.Context) {
 		panic(err)
 	}
 
-	metrics.MetricStore(wq)
+	metrics.Store(wq)
 
 	//metricSlice := metrics.WQMetricFilterAndAsm(wq)
 	//if len(wq.Timeseries) == 0 {
@@ -106,5 +107,34 @@ func Stats(c *gin.Context) {
 		"code":    http.StatusOK,
 		"message": http.StatusText(http.StatusOK),
 		"data":    statsResp,
+	})
+}
+
+// CacheResp ...
+type CacheResp struct {
+	Key   string      `json:"key"`
+	Value interface{} `json:"value"`
+	Count int         `json:"count"`
+}
+
+// Cache get cache by key
+func Cache(c *gin.Context) {
+	cache := new(CacheResp)
+	cache.Key = c.Query("key")
+	var found bool
+	cache.Value, found = gocache.Get(cache.Key)
+	cache.Count = gocache.Count()
+	if !found {
+		c.JSON(http.StatusOK, gin.H{
+			"code":    http.StatusOK,
+			"message": http.StatusText(http.StatusNotFound),
+			"data":    cache,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    http.StatusOK,
+		"message": http.StatusText(http.StatusOK),
+		"data":    cache,
 	})
 }

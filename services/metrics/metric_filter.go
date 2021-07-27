@@ -8,8 +8,8 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 )
 
-// WQMetricFilter remote 过滤metric，不符合规范的，直接丢弃
-func WQMetricFilter(wq *prompb.WriteRequest) {
+// WQFilter remote 过滤metric，不符合规范的，直接丢弃
+func WQFilter(wq *prompb.WriteRequest) {
 	var newTS []*prompb.TimeSeries
 	cfg := config.Conf.MetricFilter
 	var drop bool
@@ -36,9 +36,9 @@ func WQMetricFilter(wq *prompb.WriteRequest) {
 	return
 }
 
-// WQMetricFilterAndAsm 过滤metrics并组装，不符合规范的，直接丢弃，不组装进Metric Slice
+// WQFilterAndAsm 过滤metrics并组装，不符合规范的，直接丢弃，不组装进Metric Slice
 // 在即需要组装metrics做缓存和存储，又需要过滤metrics判断是否规范时，WQMetricFilterAndAsm可以减少遍历
-func WQMetricFilterAndAsm(wq *prompb.WriteRequest) (Metric []string) {
+func WQFilterAndAsm(wq *prompb.WriteRequest) (Metric []string) {
 	var newTS []*prompb.TimeSeries
 	cfg := config.Conf.MetricFilter
 	var drop bool
@@ -72,8 +72,8 @@ func WQMetricFilterAndAsm(wq *prompb.WriteRequest) (Metric []string) {
 	return
 }
 
-// MetricFilter 主动发送metrics请求的过滤器
-func MetricFilter(wq *apimetrics.WriteReq) {
+// Filter 主动发送metrics请求的过滤器
+func Filter(wq *apimetrics.WriteReq) {
 	var newTS []*apimetrics.TimeSeries
 	cfg := config.Conf.MetricFilter
 	var drop bool
@@ -99,9 +99,9 @@ func MetricFilter(wq *apimetrics.WriteReq) {
 	return
 }
 
-// MetricFilterAndAsm 过滤metrics并组装，不符合规范的，直接丢弃，不组装进Metric Slice
+// FilterAndAsm 过滤metrics并组装，不符合规范的，直接丢弃，不组装进Metric Slice
 // 在即需要组装metrics做缓存和存储，又需要过滤metrics判断是否规范时，MetricFilterAndAsm可以减少遍历
-func MetricFilterAndAsm(req *apimetrics.WriteReq) (Metric []string) {
+func FilterAndAsm(req *apimetrics.WriteReq) (Metric []string) {
 	var newTS []*apimetrics.TimeSeries
 	cfg := config.Conf.MetricFilter
 	var drop bool

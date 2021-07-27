@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"metric-index/config"
 	"metric-index/dao/elasticsearch"
+	"metric-index/dao/gocache"
 	"metric-index/dao/mysql"
 	"metric-index/dao/redis"
 	"metric-index/logger"
@@ -51,6 +52,10 @@ func main() {
 		return
 	}
 	defer redis.Close()
+
+	// 初始化gocache
+	gocache.Init()
+	//defer gocache.Save()
 
 	// 初始化Elasticsearch
 	if err := elasticsearch.Init(); err != nil {

@@ -21,5 +21,5 @@ func InitRoute(app *gin.Engine) {
 	})
 
 	// 注册controller/metrics的route
-	metrics.InitRoute(app)
+	metrics.Init(app)
 }
