@@ -62,7 +62,7 @@ func Store(wq *prompb.WriteRequest) {
 			}
 			bi := es.BulkIndexerItem{
 				Index:           config.Conf.MetricStore.Store.IndexName,
-				Action:          "create",
+				Action:          "index",
 				DocumentID:      "",
 				Body:            nil,
 				RetryOnConflict: nil,
