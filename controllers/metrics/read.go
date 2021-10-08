@@ -10,8 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Receiver 处理主动发送metric请求
-func Receiver(c *gin.Context) {
+// Read 处理主动发送metric请求
+func Read(c *gin.Context) {
 	req := new(apimetrics.WriteReq)
 	if err := c.ShouldBindJSON(&req); err != nil {
 		zap.L().Error("bad request, req struct can not bind json", zap.Error(err))

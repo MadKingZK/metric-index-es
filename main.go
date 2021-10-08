@@ -6,7 +6,6 @@ import (
 	"metric-index/config"
 	"metric-index/dao/elasticsearch"
 	"metric-index/dao/gocache"
-	"metric-index/dao/mysql"
 	"metric-index/dao/redis"
 	"metric-index/logger"
 	"metric-index/routes"
@@ -36,15 +35,6 @@ func main() {
 		return
 	}
 	defer zap.L().Sync()
-
-	// 初始化mysql
-	if config.Conf.MySQLConfig.Host != "" {
-		if err := mysql.Init(config.Conf.MySQLConfig); err != nil {
-			fmt.Printf("init mysql failed, err:%v\n", err)
-			return
-		}
-		defer mysql.Close()
-	}
 
 	// 初始化redis
 	if err := redis.Init(config.Conf.RedisConfig); err != nil {

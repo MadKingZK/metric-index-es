@@ -17,7 +17,6 @@ var Conf = new(Config)
 type Config struct {
 	*AppConfig   `mapstructure:"app"`
 	*LogConfig   `mapstructure:"log"`
-	*MySQLConfig `mapstructure:"mysql"`
 	*RedisConfig `mapstructure:"redis"`
 	*Remote      `mapstructure:"remote"`
 	*MetricRegex `mapstructure:"metric_filter"`
@@ -40,17 +39,6 @@ type LogConfig struct {
 	MaxSize    int    `mapstructure:"max_size"`
 	MaxAge     int    `mapstructure:"max_age"`
 	MaxBackups int    `mapstructure:"max_backups"`
-}
-
-// MySQLConfig mysql数据库配置
-type MySQLConfig struct {
-	Host         string `mapstructure:"host"`
-	User         string `mapstructure:"user"`
-	Password     string `mapstructure:"password"`
-	DBName       string `mapstructure:"db_name"`
-	Port         int    `mapstructure:"port"`
-	MaOpenConns  int    `mapstructure:"max_open_conns"`
-	MaxIdleConns int    `mapstructure:"max_idle_conns"`
 }
 
 // RedisConfig redis配置

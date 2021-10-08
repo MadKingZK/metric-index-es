@@ -34,5 +34,4 @@ config/dev.yml
 # go sum
 go.sum
 
-monica-adaptor
-monica_adaptor
+metric-index

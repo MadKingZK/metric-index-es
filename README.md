@@ -1,4 +1,4 @@
-# Monica-Adaptor
+# Metric-Index
 
 ## 项目介绍
 **一个remoteWrite的中间处理层，转存指标名，过滤不规范Metric**
@@ -26,8 +26,7 @@ Labels = []{Label.Name=Label.Value}）
 
 - Viper 配置管理，监听配置，自动加载更新
 - Zap 日志管理
-- go-sql-driver/mysql mysql驱动 
-- sqlx sql扩展，简化数据库操作
+- go-elasticsearch/v7 elasticsearch驱动
 - go-redis/redis redis驱动
 
 ## 项目编译
@@ -48,24 +47,15 @@ bash build_linux.sh
 
 ```yaml
 app: # 项目配置
-  name: "monica-adaptor"  # 项目名称
+  name: "metric-index"  # 项目名称
   port: 7001 # 项目端口
 
 log: # 日志配置
   level: "debug"  # 日志级别
-  filename: "logs/monica-adaptor.log" # 日志文件相对路径
+  filename: "logs/metric-index.log" # 日志文件相对路径
   max_size: 200 # 日志文件大小，单位MB
   max_age: 30 # 日志保存时长，单位天
   max_backups: 7 # 日志文件保存个数
-
-mysql:
-  host: "127.0.0.1"
-  port: 3306
-  user: "root"
-  password: "root"
-  dbname: "monica-adaptor"
-  max_open_conns: 200
-  max_idel_conns: 50
 
 redis:
   host: "127.0.0.1"
@@ -74,9 +64,40 @@ redis:
   db: 0
   pool_size: 100
 
-remote_write: # remote wirte转发配置，将接收到的数据转发到指定接口
-  url: "http://127.0.0.1:8428/api/v1/write" 
-  content_type: "application/x-protobuf"
+metric_filter:
+  metricNameRegex: ".*"
+  metricValueRegex: ".*"
+  labelNameRegex: ".*"
+  labelValueRegex: ".*"
+
+metric_store:
+  cache:
+    isexpire: true
+    expire: 604800
+    defaultExpire: 604800
+    cleanupInterval: 600
+    dist_interval: 172800
+    worker_num: 50
+    flush_lens: 1000
+    flush_interval: 10
+  store:
+    url:
+      - "http://elasticsearch-host:9200"
+    username:
+    password:
+    index_name: "metric-test"
+    worker_num: 50 # 写入ES工作协程数
+    flush_bytes: 5242880 # 批量写入ES的缓存队列大小
+    flush_interval: 10 # 超时刷新，时间内如果未写满队列则主动刷入ES
+
+remote: # remote wirte转发配置，将接收到的数据转发到指定接口
+  write:
+    url: "http://vminsert-host:8480/insert/1/prometheus/api/v1/write"
+    content_type: "application/x-protobuf"
+  send:
+    url: "http://vminsert-host:4242/insert/1/opentsdb/api/put"
+    content_type: "application/json"
+
 ```
 
 
@@ -98,7 +119,7 @@ remote_write: # remote wirte转发配置，将接收到的数据转发到指定�
     ```
     - config目录中创建配置文件：dev.yml
     - 执行脚本build_linux.sh打包编译
-    - 启动项目：./monica-adaptor
+    - 启动项目：./metric-index
 
 
 - 线上环境
@@ -109,5 +130,5 @@ remote_write: # remote wirte转发配置，将接收到的数据转发到指定�
     ```
     - config目录中创建配置文件：prod.yml
     - 执行脚本build_linux.sh打包编译
-    - 启动项目：./monica-adaptor
+    - 启动项目：./metric-index
  

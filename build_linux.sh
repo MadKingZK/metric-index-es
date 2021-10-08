@@ -18,4 +18,4 @@ fi
 
 set -e
 # build
-env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --tags=jsoniter -o monica-adaptor main.go
+env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --tags=jsoniter -o metric-index main.go

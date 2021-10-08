@@ -9,5 +9,5 @@ func Init(app *gin.Engine) {
 	group.GET("/write/stats", Stats)
 
 	// 废弃接口
-	//group.POST("/", Receiver)
+	group.POST("/", Read)
 }
