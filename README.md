@@ -1,7 +1,7 @@
-# Metric-Index
+# Metric-Index-ES
 
 ## 项目介绍
-**一个remoteWrite的中间处理层，转存指标名，过滤不规范Metric**
+**一个remoteWrite的中间处理层，转存指标名到ES，过滤不规范Metric**
 
 ```go
 Metric = MetricName + Labels
