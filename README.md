@@ -11,6 +11,7 @@ Labels = []{Label.Name=Label.Value}）
 - **接收RemoteWrite，处理后转存远程时序库存储**
 - **过滤不规范Metric，丢弃对应Metric**
 - **将Metric存入Redis和ES中**
+    - Gocache提供本地缓存Metric，减轻reids负担，提供Exist判断，过期时间可配置
     - Redis缓存Metric，提供Exist判断，过期时间可配置
     - ES存储Metric，提供Metric搜索，通过ES生命周期控制过期时间
 
@@ -26,8 +27,11 @@ Labels = []{Label.Name=Label.Value}）
 
 - Viper 配置管理，监听配置，自动加载更新
 - Zap 日志管理
-- go-elasticsearch/v7 elasticsearch驱动
+- patrickmn/go-cache 本地缓存
 - go-redis/redis redis驱动
+- go-elasticsearch/v7 elasticsearch驱动
+- gin-contrib/pprof Gin性能分析
+- air 能够实时监听项目的代码文件，在代码发生变更之后自动重新编译并执行
 
 ## 项目编译
 
@@ -104,7 +108,18 @@ remote: # remote wirte转发配置，将接收到的数据转发到指定接口
 
 ## 项目启动
 
-#### 测试环境
+#### 测试环境，推荐使用Air启动
+- 配置air配置文件，air能够实时监听项目的代码文件，在代码发生变更之后自动重新编译并执行，大大提高gin框架项目的开发效率
+  - [Air实时加载](http://www.topgoer.cn/docs/ginkuangjia/ginairshishijiazai)
+  - 根据上面教程安装air、配置.air.conf，需要修改full_bin，添加开发环境的环境变量参数
+    ```bash
+    full_bin = "export GO_ENV=dev; ./tmp/main"
+    ```
+  - 启动项目
+    ```bash
+    air -c .air.conf
+    ```
+
 - goland运行
 
 ```
@@ -122,13 +137,90 @@ remote: # remote wirte转发配置，将接收到的数据转发到指定接口
     - 启动项目：./metric-index
 
 
-- 线上环境
-    - 配置环境变量
+#### 线上环境
+- 优化系统配置
+    ```bash
+    # 注释/etc/security/limits.d/20-nproc.conf内所有配置
+    > sed -i 's/^[^#]/#&/g' /etc/security/limits.d/20-nproc.conf
+
+    # 配置/etc/security/limits.d/limit.conf，重新登录中端使之生效
+    > cat /etc/security/limits.d/limits.conf | egrep -v '^#|^$'
+    root soft nofile 1024000
+    root hard nofile 1024000
+    * soft nofile 1024000
+    * hard nofile 1024000
+    ```
+
+- 优化supervisor配置
+    ```bash
+    # 修改文件/etc/supervisord.conf中下面配置项，重启supervisor
+    minfds=1024000
+    minprocs=1024000
+    ```
+  
+- 配置supervisor项目启动文件
+    ```bash
+    > cat /etc/supervisord.d/metric-index.conf
+    [program:metric-index]
+    command=/opt/metric-index/monica-index
+    directory=/opt/metric-index/
+    user=root
+    environment=GO_ENV="prod"
+    # ,GOMAXPROCS=7
+    stderr_logfile=/var/log/supervisor/metric-index-err.log
+    stdout_logfile=/var/log/supervisor/metric-index-info.log
+    autostart=true
+    autorestart=true
+    startsecs=3
+    ```
+
+- 配置环境变量
 
     ```bash
     sudo echo 'export GO_ENV=prod' >> ~/.zshrc
     ```
     - config目录中创建配置文件：prod.yml
-    - 执行脚本build_linux.sh打包编译
-    - 启动项目：./metric-index
+    - 执行脚本build_linux.sh打包编译，二进制文件metric-index发布到/opt/metric-index/
+    - 启动项目：`supervisorctl update`、`supervisorctl start metric-index`
+ 
+
+## 性能分析
+
+- 项目配置了gin-contrib/pprof，可以通过pprof工具进行性能分析，接口为`/debug/pprof/`
+- mac安装pprof
+    - 安装 graphviz，支持打开svg文件
+        ```bash
+        brew install graphviz
+        ```
+  
+    - 安装pprof工具
+        ```bash
+        go get github.com/gin-contrib/pprof
+        ```
+  
+    - 测试pprof
+        ```bash
+        go tool pprof --help
+        ```
+
+- 执行pprof进行数据收集分析
+    - cpu分析
+        ```bash
+        go tool pprof --seconds 60 http://[host]:[port]/debug/pprof/profile
+        ```
+  
+    - memory分析
+        ```bash
+        go tool pprof --seconds 60 http://[host]:[port]/debug/pprof/heap
+        ```
+
+    - goroutine分析
+        ```bash
+        go tool pprof --seconds 60 http://[host]:[port]/debug/pprof/goroutine
+        ```
+
+- 查看分析结果
+    - pprof指令执行完后，会提示生成的分析文件位置
+    - 打开分析文件
+    - 例如：`go tool pprof -http 127.0.0.1:port [pproffile path]`
  
